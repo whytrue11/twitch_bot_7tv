@@ -7,6 +7,19 @@ from twitchAPI.oauth import UserAuthenticator
 from twitchAPI.object.eventsub import ChannelPointsCustomRewardRedemptionAddEvent
 from twitchAPI.twitch import Twitch
 from twitchAPI.type import AuthScope, ChatEvent
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+APP_ID = os.getenv("APP_ID")
+APP_SECRET = os.getenv("APP_SECRET")
+#USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT, AuthScope.CHANNEL_READ_REDEMPTIONS]
+USER_SCOPE = AuthScope.__members__.values()
+TARGET_CHANNEL = os.getenv("TARGET_CHANNEL")
+BOT_NAME = os.getenv("BOT_NAME")
+SEVEN_TV_SET_ID = os.getenv("SEVEN_TV_SET_ID")
+SEVEN_TV_TOKEN = os.getenv("SEVEN_TV_TOKEN")
 
 
 # region 7tv
