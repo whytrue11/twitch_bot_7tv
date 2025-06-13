@@ -55,8 +55,12 @@ def add_7tv_emote(emote_alias: str, emote_id: str):
     }
 
     response = requests.post(url, json=payload, headers=headers)
-    if response.status_code != 200:
+    print(f"Request to add 7tv emote: {payload}")
+    print(f"Response to add 7tv emote: {response.text}")
+    if response.text.__contains__("BAD_REQUEST"):
         print("Error to add 7tv emote")
+        return False
+    return True
 
 
 def remove_7tv_emote(emote_id: str):
@@ -95,5 +99,8 @@ def remove_7tv_emote(emote_id: str):
     }
 
     response = requests.post(url, json=payload, headers=headers)
-    if response.status_code != 200:
+    print(f"Response to remove 7tv emote: {response.text}")
+    if response.text.__contains__("BAD_REQUEST"):
         print("Error to remove 7tv emote")
+        return False
+    return True

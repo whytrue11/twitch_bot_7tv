@@ -17,43 +17,47 @@ APP_ID = os.getenv("APP_ID")
 APP_SECRET = os.getenv("APP_SECRET")
 TARGET_CHANNEL = os.getenv("TARGET_CHANNEL")
 USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT]
-EXPIRE_EMOTE_TIME_IN_SECONDS = 10.0
+EXPIRE_EMOTE_TIME_IN_SECONDS = 20.0
 
 # region 7tv
 seven_tv_emotes_pool = [
-    "01GX9BDHSR000DACH8GVDFE60G"  # taa
-    "01J0ZYSN700003YPW34K535MQD"  # dura
-    "01HNTK4C40000FG935RNS75ZEV"  # Durak66
-    "01GRZ9G7GG000F4NDY99DZYBY4"  # Villager
-    "01J399FVVR00046F97SBJG388M"  # ore
-    "01FNFE2MT80001BCZZ99DVFRZY"  # POOPYPOP
-    "01G7HBWGZ8000DJJQKZ99T0A2Y"  # xd
+    "01GX9BDHSR000DACH8GVDFE60G",  # taa
+    "01J0ZYSN700003YPW34K535MQD",  # dura
+    "01HNTK4C40000FG935RNS75ZEV",  # Durak66
+    "01GRZ9G7GG000F4NDY99DZYBY4",  # Villager
+    "01J399FVVR00046F97SBJG388M",  # ore
+    "01FNFE2MT80001BCZZ99DVFRZY",  # POOPYPOP
+    "01G7HBWGZ8000DJJQKZ99T0A2Y",  # xd
     "01FZJGSGJ8000872XQ7VQHCNRZ"  # XyliGun
 ]
 
 active_emotes = []
 
-
 def get_radom_7tv_emote_id():
-    emote_id = random.choice(seven_tv_emotes_pool)
-    seven_tv_emotes_pool.remove(emote_id)
+    emote_id = None
+    if seven_tv_emotes_pool:  # Если список не пустой
+        emote_id = random.choice(seven_tv_emotes_pool)
+        seven_tv_emotes_pool.remove(emote_id)
     return emote_id
 
 
 def activate_7tv_emote(emote_alias: str, emote_id: str):
-    add_7tv_emote(emote_alias, emote_id)
+    if not add_7tv_emote(emote_alias, emote_id):
+        return False
     active_emotes.append(ActiveEmote(emote_id, emote_alias))
+    return True
 
 
 def deactivate_7tv_emote(emote: ActiveEmote):
-    remove_7tv_emote(emote.id)
+    if not remove_7tv_emote(emote.id):
+        return
     active_emotes.remove(emote)
 
 
 async def check_emote_expiry():
     """Проверяем и удаляем просроченные смайлы"""
     while True:
-        print("task")
+        print("Scheduled check expired emotions")
         current_time = time.time()
         emotes_to_remove = []
 
@@ -86,10 +90,19 @@ async def on_message(msg: ChatMessage):
 
 # this will be called whenever the !reply command is issued
 async def test_command(cmd: ChatCommand):
-    if len(cmd.parameter) == 0:
-        print(0)
+    emote_id = get_radom_7tv_emote_id()
+    if emote_id is None:
+        await cmd.reply(f"[я бот] все смайлики уже заняты, попробуйте чуть позже")
+        return
+    elif len(cmd.parameter) == 0 or cmd.parameter == "\U000e0000":
+        emote_alias = cmd.user.name
     else:
-        await cmd.reply(f'{cmd.user.name}: {cmd.parameter}')
+        emote_alias = cmd.parameter
+
+    if activate_7tv_emote(emote_alias, emote_id):
+        await cmd.reply(f"[я бот] добавлен смайлик {emote_alias}")
+    else:
+        await cmd.reply(f"[я бот] ошибка при добавлении смайлика {emote_alias}")
 
 
 # this is where we set up the bot
