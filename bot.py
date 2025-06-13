@@ -1,25 +1,73 @@
 import asyncio
+import os
+import random
+import time
 
+from dotenv import load_dotenv
 from twitchAPI.chat import Chat, EventData, ChatMessage, ChatCommand
-from twitchAPI.eventsub.websocket import EventSubWebsocket
-from twitchAPI.helper import first
 from twitchAPI.oauth import UserAuthenticator
-from twitchAPI.object.eventsub import ChannelPointsCustomRewardRedemptionAddEvent
 from twitchAPI.twitch import Twitch
 from twitchAPI.type import AuthScope, ChatEvent
-import os
-from dotenv import load_dotenv
+
+from sevenTV import add_7tv_emote, ActiveEmote, remove_7tv_emote
 
 load_dotenv()
 
 APP_ID = os.getenv("APP_ID")
 APP_SECRET = os.getenv("APP_SECRET")
-#USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT, AuthScope.CHANNEL_READ_REDEMPTIONS]
-USER_SCOPE = AuthScope.__members__.values()
 TARGET_CHANNEL = os.getenv("TARGET_CHANNEL")
-BOT_NAME = os.getenv("BOT_NAME")
-SEVEN_TV_SET_ID = os.getenv("SEVEN_TV_SET_ID")
-SEVEN_TV_TOKEN = os.getenv("SEVEN_TV_TOKEN")
+USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT]
+EXPIRE_EMOTE_TIME_IN_SECONDS = 10.0
+
+# region 7tv
+seven_tv_emotes_pool = [
+    "01GX9BDHSR000DACH8GVDFE60G"  # taa
+    "01J0ZYSN700003YPW34K535MQD"  # dura
+    "01HNTK4C40000FG935RNS75ZEV"  # Durak66
+    "01GRZ9G7GG000F4NDY99DZYBY4"  # Villager
+    "01J399FVVR00046F97SBJG388M"  # ore
+    "01FNFE2MT80001BCZZ99DVFRZY"  # POOPYPOP
+    "01G7HBWGZ8000DJJQKZ99T0A2Y"  # xd
+    "01FZJGSGJ8000872XQ7VQHCNRZ"  # XyliGun
+]
+
+active_emotes = []
+
+
+def get_radom_7tv_emote_id():
+    emote_id = random.choice(seven_tv_emotes_pool)
+    seven_tv_emotes_pool.remove(emote_id)
+    return emote_id
+
+
+def activate_7tv_emote(emote_alias: str, emote_id: str):
+    add_7tv_emote(emote_alias, emote_id)
+    active_emotes.append(ActiveEmote(emote_id, emote_alias))
+
+
+def deactivate_7tv_emote(emote: ActiveEmote):
+    remove_7tv_emote(emote.id)
+    active_emotes.remove(emote)
+
+
+async def check_emote_expiry():
+    """Проверяем и удаляем просроченные смайлы"""
+    while True:
+        print("task")
+        current_time = time.time()
+        emotes_to_remove = []
+
+        # Находим смайлы, у которых истекло время
+        for emote in active_emotes:
+            if current_time >= emote.start_time + EXPIRE_EMOTE_TIME_IN_SECONDS:
+                emotes_to_remove.append(emote)
+
+        # Удаляем их
+        for emote in emotes_to_remove:
+            deactivate_7tv_emote(emote)
+        await asyncio.sleep(EXPIRE_EMOTE_TIME_IN_SECONDS)
+
+# endregion
 
 
 # this will be called when the event READY is triggered, which will be on bot start
@@ -33,23 +81,15 @@ async def on_ready(ready_event: EventData):
 
 # this will be called whenever a message in a channel was send by either the bot OR another user
 async def on_message(msg: ChatMessage):
-    print(f'in {msg.room.name}, {msg.user.name} said: {msg.text}')
+    print(f'{msg.user.name} said: "{msg.text}"')
 
 
 # this will be called whenever the !reply command is issued
 async def test_command(cmd: ChatCommand):
     if len(cmd.parameter) == 0:
-        await cmd.reply('you did not tell me what to reply with')
+        print(0)
     else:
         await cmd.reply(f'{cmd.user.name}: {cmd.parameter}')
-
-
-async def on_channel_points_reward(reward: ChannelPointsCustomRewardRedemptionAddEvent):
-    if reward.event.id == "7tv emote":
-        print("7tv activated")
-    print(f"New reward redeemed by {reward.event.user_name}!")
-    print(f"Reward: {reward.event.id}")
-    print(f"User input: {reward.event.message.text}")
 
 
 # this is where we set up the bot
@@ -70,27 +110,35 @@ async def run():
     # listen to chat messages
     chat.register_event(ChatEvent.MESSAGE, on_message)
     # you can directly register commands and their handlers, this will register the !reply command
-    chat.register_command('reply', test_command)
+    chat.register_command('7tv', test_command)
     # we are done with our setup, lets start this bot up!
     chat.start()
 
-    target_channel_user = await first(twitch.get_users(logins=TARGET_CHANNEL))
-    print(f"User: {target_channel_user.login}, id: {target_channel_user.id}")
-    bot_user = await first(twitch.get_users(logins=BOT_NAME))
-    print(f"User: {bot_user.login}, id: {bot_user.id}")
-    # rewards
-    eventsub = EventSubWebsocket(twitch)
-    eventsub.start()
-    await eventsub.listen_channel_points_custom_reward_redemption_add(target_channel_user.id, on_channel_points_reward)
-    #await event_sub.listen_channel_points_automatic_reward_redemption_add_v2(target_channel_user.id, on_channel_points_reward)
+    expiry_task = asyncio.create_task(check_emote_expiry())
 
+    # Create a future that we'll wait for
+    loop = asyncio.get_event_loop()
+    stop_future = loop.create_future()
+    # Run input in executor (separate thread)
+    def check_input():
+        input('press ENTER to stop\n')
+        loop.call_soon_threadsafe(stop_future.set_result, None)
+
+    await loop.run_in_executor(None, check_input)
     # lets run till we press enter in the console
     try:
-        input('press ENTER to stop\n')
+        await stop_future
     finally:
-        # now we can close the chat bot and the twitch api client
+        expiry_task.cancel()
+        try:
+            await expiry_task
+        except asyncio.CancelledError:
+            pass
+
+        # cleanup emotes and close connections
+        for emote in active_emotes:
+            deactivate_7tv_emote(emote)
         chat.stop()
-        await eventsub.stop()
         await twitch.close()
 
 
