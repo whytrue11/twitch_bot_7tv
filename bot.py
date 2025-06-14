@@ -17,7 +17,7 @@ APP_ID = os.getenv("APP_ID")
 APP_SECRET = os.getenv("APP_SECRET")
 TARGET_CHANNEL = os.getenv("TARGET_CHANNEL")
 USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT]
-EXPIRE_EMOTE_TIME_IN_SECONDS = 20.0
+EXPIRE_EMOTE_TIME_IN_SECONDS = 300.0
 
 # region 7tv
 seven_tv_emotes_pool = [
@@ -28,7 +28,13 @@ seven_tv_emotes_pool = [
     "01J399FVVR00046F97SBJG388M",  # ore
     "01FNFE2MT80001BCZZ99DVFRZY",  # POOPYPOP
     "01G7HBWGZ8000DJJQKZ99T0A2Y",  # xd
-    "01FZJGSGJ8000872XQ7VQHCNRZ"  # XyliGun
+    "01FZJGSGJ8000872XQ7VQHCNRZ",  # XyliGun
+    "01HP1EQW080005997TAXSX4S47",  #ButtersBan
+    "01FE9ZEQ3R000518RJG2G6XK2G",  #INSANECAT
+    "01FGC0GHM000064MEQW00DMSJW",  #STRONGERS
+    "01GGBFACRR0008AT9NTGKV7VJ9",  #BIGCORGI
+    "01G6ABQWCG000AE6YXS14X4SD6",  #CorgiButt
+    "01HBJ8QKCG000EE79BCJA0VG7K",  #FROG
 ]
 
 active_emotes = []
@@ -52,6 +58,7 @@ def deactivate_7tv_emote(emote: ActiveEmote):
     if not remove_7tv_emote(emote.id):
         return
     active_emotes.remove(emote)
+    seven_tv_emotes_pool.append(emote.id)
 
 
 async def check_emote_expiry():
@@ -63,13 +70,13 @@ async def check_emote_expiry():
 
         # Находим смайлы, у которых истекло время
         for emote in active_emotes:
-            if current_time >= emote.start_time + EXPIRE_EMOTE_TIME_IN_SECONDS:
+            if current_time >= (emote.start_time + EXPIRE_EMOTE_TIME_IN_SECONDS):
                 emotes_to_remove.append(emote)
 
         # Удаляем их
         for emote in emotes_to_remove:
             deactivate_7tv_emote(emote)
-        await asyncio.sleep(EXPIRE_EMOTE_TIME_IN_SECONDS)
+        await asyncio.sleep(EXPIRE_EMOTE_TIME_IN_SECONDS / 4)
 
 # endregion
 
@@ -100,9 +107,11 @@ async def test_command(cmd: ChatCommand):
         emote_alias = cmd.parameter
 
     if activate_7tv_emote(emote_alias, emote_id):
-        await cmd.reply(f"[я бот] добавлен смайлик {emote_alias}")
+        print("Smile added")
+        #await cmd.reply(f"[я бот] добавлен смайлик {emote_alias}")
     else:
         await cmd.reply(f"[я бот] ошибка при добавлении смайлика {emote_alias}")
+        print("Smile not added")
 
 
 # this is where we set up the bot
